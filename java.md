@@ -400,3 +400,48 @@ public class ShuffleDeck implements Command {
 
 ## Observer Design Pattern
 
+Often times, different classes need to interact with each other. A poor design would be to store a reference to all other classes for each class.
+It limits encapsulation, as well as code flexibility. Instead, if multiple classes are affected by another class, we may use the observer design pattern.
+
+The concept lies in two entities, the `Observer` and the `Observable`. Classes which receive an input are `Observer`s, and a collection of such `Observer`s will be held in an `Observable`.
+
+The general interface is as follows:
+
+```java
+interface Observable<T> {
+    /**
+     * Add given observer to collection
+     */
+    void addObserver(Observer<T> observer);
+    /**
+     * Remove given observer if found in collection
+     */
+    void removeObserver(Observer<T> observer);
+    /**
+     * Iterate through collection and call receiveEvent
+     */
+    void notifyObserver(T event);
+}
+
+interface Observer<T> {
+    /**
+     * Handle whatever event is received
+     */
+    void receiveEvent(T event);
+}
+```
+
+The general idea is that observers will bind to the observables and unbind when they are no longer in use. They do not need to worry about any of the implementation apart from receiving the actual event.
+
+The observable on the other hand, manages everything up to handling the event. At that point, it will simply delegate everything to its collection of observers.
+
+This way, implementations are encapsulated in their respective classes, and there is no tight coupling between classes.
+
+### Extra
+
+Observer patterns are very common in Android touch events, where parent views must interact with child views to handle input. A nice way of communicating and consuming such events would be to have `boolean receiveEvent(T event)`, where retuning `true` represents handling the input, and `false` represents the need to continue propagating the event. 
+
+The type `T` you use in this pattern is entirely up to you. It may be an `int` to indicate progress, an object to indicate some complex event, or you may even have no arguments at all if all you require is a prompt to continue acting.
+
+For reasons you will see later, if you have multiple event types, you may wish to provide multiple event handlers (`receiveEvent1(U event)`, `receiveEvent2(V event)`, ...). This avoids confusion as to which methods handle what.
+
