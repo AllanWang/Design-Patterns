@@ -149,7 +149,7 @@ public class Deck {
     private static final Card[] cards = new Card[52];
     private static final int suitSize = Suit.values().length; // 4
 
-    public static Card getCard(Suit suit, Rank rank) {
+    public static Card getCard(Rank rank, Suit suit) {
         int index = rank.ordinal() * suitSize + suit.ordinal;
         Card card = cards[index];
         if (card == null) {                 // generate once
@@ -331,3 +331,72 @@ public class GiftItem implements Item {
     }
 }
 ```
+
+## Cloning
+
+All Java objects have a `clone()` method, but it needs to be implemented by the developer.
+The goal of cloning is to create a new object, which is independent of the first one, but structurally equal.
+
+Example: 
+
+```java
+public class Card implements Cloneable { // implement this blank interface
+    private Rank rank;
+    private Suit suit;
+
+    ...
+
+    @Override
+    public Card clone() {               // return type can be any subclass of the super class
+        try {
+            Card clone = super.clone(); // construct from super class, not by own constructor
+            clone.rank = this.rank;     // update the remaining attributes
+            clone.suit = this.suit;     // specific to this class
+        } catch (CloneNotSupportedException e) {
+            return null;                // occurs when super.clone is called from a class 
+                                        // that doesn't implement Cloneable
+                        
+        }
+    }
+}
+```
+
+Unfortunately, this isn't as straightforward with final attributes.
+You may consider reflection for this.
+
+## Command Design Pattern
+
+The command design pattern is a means of making a method callable without arguments.
+This is possible be wrapping all the needed states into an object, so that it may be executeed independently.
+
+Typically, we'll have a command interface:
+
+```java
+public interface Command {
+    void execute();
+}
+```
+
+And other concrete commands that implement the interface.
+
+Example:
+
+```java
+public class ShuffleDeck implements Command {
+
+    private final Deck deck;
+
+    public ShuffleDeck(Deck deck) {
+        this.deck = deck;
+    }
+
+    @Override
+    public void execute() {
+        deck.shuffle();
+    }
+
+}
+```
+
+## Observer Design Pattern
+
