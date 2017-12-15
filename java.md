@@ -445,3 +445,276 @@ The type `T` you use in this pattern is entirely up to you. It may be an `int` t
 
 For reasons you will see later, if you have multiple event types, you may wish to provide multiple event handlers (`receiveEvent1(U event)`, `receiveEvent2(V event)`, ...). This avoids confusion as to which methods handle what.
 
+## Inheritance
+
+The benefit of inheritance is to leverage polymorphism and to make code design more extensible and reusable. As noted above, returning an `Iterable<T>` allows us to define the behaviour in any implementation of that interface without affecting how the user handles the output.
+
+When solely dealing with interfaces, everything is nice and freely extensible, but what if we have some methods which require states, or methods that are the same across many implementations? A good design aims to reduce duplicate code, so we may define classes that inherit or extend other classes.
+
+For instance, if we have
+
+```java
+interface Employee {
+    String getName();
+    float getSalary();
+}
+
+class Programmer implements Employee {
+    private final String name;
+    private final float salary;
+
+    ...
+}
+
+class Manager implements Employee {
+    private final String name;
+    private final float salary;
+    private final int bonus;
+
+    ...
+}
+```
+
+We may instead have
+
+```java
+class Employee {
+    private final String name;
+    private final float salary;
+
+    ...
+
+    String getName() {
+        return name;
+    }
+
+    float getSalary() {
+        return salary;
+    }
+}
+
+class Manager extends Programmer {
+    private final int bonus;
+
+    ...
+}
+```
+
+This way, `getName()` and `getSalary()` can be implemented once in `Employee` and inherited for all sub classes.
+
+Notice that inheritance induces a subtyping relation, meaning we may define a new manager through
+
+```java
+Manager m = new Manager();
+```
+
+but also
+
+```java
+Employee m = new Manager();
+```
+
+The run-time type of `m` is defined by its constructor type `Manager`, regardless of its compile time type of `Manager` or `Employee`. Run-time types are the most specific classes pertaining to the object.
+
+In inherited classes, the constructor will automatically call the super constructor (up until the highest super class `Object`) before handling the data in the current class. Also note that if no constructor is specified, an "invisible" empty constructor (taking in no arguments) is implied.
+
+### Pitfalls in Inheritance
+
+Inheritance is great for extending behaviour, but should be avoided when trying to restrict behaviour or form a class which is not truly a subtype of the superclass.
+
+An example is the [Circle-ellipse](https://en.wikipedia.org/wiki/Circle-ellipse_problem) problem, where the `Circle` implementation inherits the `Ellipse` implementation. Even though the two share many methods and states, the extension proves to be problematic when calls such as the following:
+
+```java
+Ellipse ellipse = new Ellipse();
+ellipse.setHeight(ellipse.getWidth() * 2);
+```
+
+are perfectly valid for `Ellipse`, but no longer valid for `Circle`.
+
+If we really wish to maintain some form of inheritance, we may consider having both shapes extend some other interface whose methods are valid in both types.
+
+## Overloading Methods
+
+Overloading is when multiple methods with the same method name have different signatures, and therefore accept different inputs. An example is `Math.abs(x)`, where `x` may be an `int`, `long`, `float`, or `double`. One very important note is that the method is picked based on the _compile time type_ of the _explicit arguments_. The selection will consider all valid methods and apply the most specific ones. For instance, consider:
+
+```java
+public class Type {
+
+    public static void main(String[] args) {
+        Parent p = new Parent();
+        Parent c = new Child();
+        Type t = new Type();
+        t.print(p);
+        t.print(c);
+    }
+
+    void print(Parent parent) {
+        System.out.println("parent");
+    }
+
+    void print(Child child) {
+        System.out.println("child");
+    }
+
+    static class Parent { }
+
+    static class Child extends Parent { }
+}
+```
+
+Though we may expect `print(c)` to print "child", it actually still prints "parent" as its compile-time type is `Parent`. (The same output occurs if the print statements were static.)
+
+## Template Method Design Pattern
+
+We often have cases in inheritance where several classes have the same general work flow, but different implementations for specific steps. In this case, we may increase code reuse by defining a template in a super class, and making the steps abstract so that they may be defined in subclasses.
+
+As an example, consider a `draw()` method that does the following:
+
+1. Invalidate the canvas
+1. Draw the figure
+1. Notify listeners on completion
+
+This procedure will occur for all figures, and the only part that differs is the drawing part.
+We may provide a template by specifying an `AbstractFigure` like so:
+
+```java
+public abstract class AbstractFigure {
+
+    private void invalidate(Canvas canvas) {
+        // assume implementation
+    }
+
+    private void notifyListeners(Canvas canvas) {
+        // assume implementation
+    }
+
+    public final void draw(Canvas canvas) {
+        invalidate(canvas);
+        drawFigure(canvas);
+        notifyListeners(canvas);
+    }
+
+    protected abstract void drawFigure(Canvas canvas);
+
+}
+```
+
+Note that
+* The `draw` implementation is provided with a series of steps (our template).
+    * Though not required, it is nice to make this method `final` so that subclasses don't override it.
+* Common implementations `invalidate` and `notifyListeners` are done directly in the abstract class.
+* Differing implementation `drawFigure` is left abstract for subclasses to define.
+    * The method cannot be `private` as it needs to be overridden. Your compiler will also enforce this.
+    * In our case, we choose `protected` so that any subclass may override the method.
+
+## Visitor Design Pattern
+
+The visitor design pattern allows you to
+* Execute an action that will propagate through a data structure without polluting the classes.
+* Recover type information when traversing through objects of differing types.
+* Allows for double dispatch
+    * Typical method calls are single dispatch - they depend on the method name and the receiver type.
+    * Visitor patterns are double dispatch in that they depend on the method name, element type, and the visitor type.
+
+Consider an example for a hierarchical file system, containing files and directories. The basic interface is like so:
+
+```java
+interface Element {
+    void accept(Visitor v);
+}
+
+interface Visitor {
+    // define all valid element types here
+    void visit(File f);
+    void visit(Directory d);
+}
+```
+
+with possible class implementations like so:
+
+```java
+abstract class Base implements Element {
+
+    private final String name;
+
+    Base(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+
+public class File extends Base {
+
+    public File(String name) {
+        super(name);
+    }
+
+    @Override
+    public void accept(Visitor v) {
+        v.visit(this);
+    }
+}
+
+public class Directory extends Base {
+
+    private final List<Directory> directories = new ArrayList<>();
+    private final List<File> files = new ArrayList<>();
+
+    public Directory(String name) {
+        super(name);
+    }
+    
+    /**
+     * Add child files
+     */
+    public Directory withFiles(File... files) {
+        this.files.addAll(Arrays.asList(files));
+        return this;
+    }
+
+    /**
+     * Add child directories
+     */
+    public Directory withDirectories(Directory... directories) {
+        this.directories.addAll(Arrays.asList(directories));
+        return this;
+    }
+
+    @Override
+    public void accept(Visitor v) {
+        v.visit(this);
+        // propagate visitor to children
+        directories.forEach(v::visit);
+        files.forEach(v::visit);
+    }
+}
+```
+
+Now, we are free to create any visitor to execute what we desire. For example, if we wish to see if we have a file with a given name, we may write:
+
+```java
+public static boolean containsFile(Directory directory, String name) {
+    final boolean[] containsFile = {false};
+
+    Visitor visitor = new Visitor() {
+        @Override
+        public void visit(File f) {
+            if (f.getName().equals(name))
+                containsFile[0] = true;
+        }
+
+        @Override
+        public void visit(Directory d) {
+            // do nothing
+        }
+    };
+    directory.accept(visitor);
+    
+    return containsFile[0];
+}
+```
+
+Of course, in this case, we may wish to stop our visits as soon as we find a matching file. Like the observer pattern, we may redefine our visit to return a `boolean`, where `true` means that a visit has been satisfied and should no longer propagate, and `false` means it should continue. We'd also have to reflect that in our `Directory` implementation.
